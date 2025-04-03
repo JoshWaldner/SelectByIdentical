@@ -13,7 +13,7 @@ WORKSPACE_ID = "FusionSolidEnvironment"
 PANEL_ID = "SelectPanel"
 COMMAND_BESIDE_ID = "SelectionFilterCommand"
 ICON_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resources", "")
-
+SelectedDefault = [0, "Bodies"]
 handlers = []
 SelectedList = []
 
@@ -78,7 +78,7 @@ class CommandEventHandler(adsk.core.CommandCreatedEventHandler):
         super().__init__()
 
     def notify(self, args):
-        #adsk.core.Application.get().log(args.firingEvent.name)
+        # adsk.core.Application.get().log(args.firingEvent.name)
         try:
             global handlers
             SelectedList.clear()
@@ -98,11 +98,14 @@ class CommandEventHandler(adsk.core.CommandCreatedEventHandler):
             handlers.append(onInputChanged)
 
             inputs = cmd.commandInputs
-            Dropdown = inputs.addDropDownCommandInput("SelectObject", "Select Object", 1)
-            Dropdown.listItems.add("Bodies", True)
+            Dropdown = inputs.addDropDownCommandInput(
+                "SelectObject", "Select Object", 1
+            )
+            Dropdown.listItems.add("Bodies", False)
             Dropdown.listItems.add("Componants", False)
+            Dropdown.listItems.item(SelectedDefault[0]).isSelected = True
             Selection = inputs.addSelectionInput("Selection", "Selection", "")
-            Selection.addSelectionFilter("SolidBodies")
+            Selection.addSelectionFilter(SelectedDefault[1])
             Selection.setSelectionLimits(1, 0)
 
             onCommandTerminated = MyCommandTerminatedHandler()
@@ -118,7 +121,7 @@ class MyCommandTerminatedHandler(adsk.core.ApplicationCommandEventHandler):
         super().__init__()
 
     def notify(self, args: adsk.core.ApplicationCommandEventArgs):
-        #adsk.core.Application.get().log(args.firingEvent.name)
+        # adsk.core.Application.get().log(args.firingEvent.name)
         for i in SelectedList:
 
             sels: adsk.core.Selections = ui.activeSelections
@@ -141,7 +144,7 @@ class MyExecuteHandler(adsk.core.CommandEventHandler):
         super().__init__()
 
     def notify(self, args: adsk.core.CommandEventArgs):
-        #adsk.core.Application.get().log(args.firingEvent.name)
+        # adsk.core.Application.get().log(args.firingEvent.name)
 
         inputs: adsk.core.CommandInputs = args.command.commandInputs
         Selection: adsk.core.SelectionCommandInput = inputs.itemById("Selection")
@@ -161,7 +164,7 @@ class MyPreviewHandler(adsk.core.CommandEventHandler):
     def notify(self, args: adsk.core.CommandEventArgs):
         # adsk.core.Application.get().log(args.firingEvent.name)
         args.command.executePreview
-
+        global SelectedDefault
         inputs: adsk.core.CommandInputs = args.command.commandInputs
         Object: adsk.core.DropDownControl = inputs.itemById("SelectObject")
         Selection: adsk.core.SelectionCommandInput = inputs.itemById("Selection")
@@ -170,30 +173,47 @@ class MyPreviewHandler(adsk.core.CommandEventHandler):
         rootComp: adsk.fusion.Component = design.rootComponent
 
         if Object.selectedItem.name == "Bodies":
+
+            SelectedDefault[0] = 0
+            SelectedDefault[1] = "Bodies"
             Entity: adsk.fusion.BRepBody
             for i in rootComp.bRepBodies:
                 if i.isSolid:
-                    if abs(i.volume - Entity.volume) < 0.001 and abs(i.area - Entity.area) < .001:
+                    if (
+                        abs(i.volume - Entity.volume) < 0.001
+                        and abs(i.area - Entity.area) < 0.001
+                    ):
                         Selection.addSelection(i)
 
             for i in rootComp.allOccurrences:
                 for x in i.bRepBodies:
                     if x.isSolid:
-                        if abs(x.volume - Entity.volume) < 0.001 and abs(x.area - Entity.area) < .001:
+                        if (
+                            abs(x.volume - Entity.volume) < 0.001
+                            and abs(x.area - Entity.area) < 0.001
+                        ):
                             Selection.addSelection(x)
 
         elif Object.selectedItem.name == "Componants":
+            SelectedDefault[0] = 1
+            SelectedDefault[1] = "Occurrences"
             Entity: adsk.fusion.Occurrence
             for i in rootComp.allOccurrences:
                 if i.bRepBodies.count != 0:
                     if i.bRepBodies[0].isSolid:
-                        if abs(i.bRepBodies[0].volume - Entity.bRepBodies[0].volume) < .001 and abs(i.bRepBodies[0].area - Entity.bRepBodies[0].area) < .001:
+                        if (
+                            abs(i.bRepBodies[0].volume - Entity.bRepBodies[0].volume)
+                            < 0.001
+                            and abs(i.bRepBodies[0].area - Entity.bRepBodies[0].area)
+                            < 0.001
+                        ):
                             Selection.addSelection(i)
+
 
 class MyInputChangedHandler(adsk.core.InputChangedEventHandler):
     def __init__(self):
         super().__init__()
-    
+
     def notify(self, eventArgs):
         Args = adsk.core.InputChangedEventArgs.cast(eventArgs)
         inputs = Args.inputs
@@ -201,7 +221,7 @@ class MyInputChangedHandler(adsk.core.InputChangedEventHandler):
         input = Args.input
         Object: adsk.core.DropDownControl = inputs.itemById("SelectObject")
         Selection: adsk.core.SelectionCommandInput = inputs.itemById("Selection")
-        
+
         if input.id == "SelectObject":
 
             Selection.clearSelectionFilter()
@@ -211,4 +231,4 @@ class MyInputChangedHandler(adsk.core.InputChangedEventHandler):
                 Selection.addSelectionFilter("SolidBodies")
             elif Object.selectedItem.name == "Componants":
                 Selection.addSelectionFilter("Occurrences")
-                g=6
+                g = 6
